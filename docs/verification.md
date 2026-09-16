@@ -1,6 +1,6 @@
 # Verification record
 
-Executed on 17 September 2026 (Asia/Kolkata). Results are measurements from this development environment, not production capacity guarantees.
+Executed on 17 September 2026. Results are measurements from this development environment, not production capacity guarantees.
 
 ## Environment
 
