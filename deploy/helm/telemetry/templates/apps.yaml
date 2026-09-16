@@ -1,0 +1,65 @@
+{{- $root := . -}}
+{{- range $role := list "broker" "collector" "streamer" "api" }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "telemetry.name" $root }}-{{ $role }}
+spec:
+  replicas: {{ index $root.Values $role "replicas" }}
+  selector:
+    matchLabels: {app.kubernetes.io/instance: {{ $root.Release.Name }}, app.kubernetes.io/component: {{ $role }}}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/instance: {{ $root.Release.Name }}, app.kubernetes.io/component: {{ $role }}}
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 40
+      securityContext: {runAsNonRoot: true, runAsUser: 65532, runAsGroup: 65532, seccompProfile: {type: RuntimeDefault}}
+      {{- if $root.Values.spreadAcrossNodes }}
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels: {app.kubernetes.io/instance: {{ $root.Release.Name }}, app.kubernetes.io/component: {{ $role }}}
+      {{- end }}
+      containers:
+        - name: {{ $role }}
+          image: "{{ $root.Values.image.repository }}:{{ $root.Values.image.tag }}"
+          imagePullPolicy: {{ $root.Values.image.pullPolicy }}
+          args: [{{ $role }}]
+          ports: [{name: http, containerPort: 8080}]
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+          env:
+            - name: DATABASE_URL
+              valueFrom: {secretKeyRef: {name: {{ include "telemetry.dbSecret" $root }}, key: url}}
+            - name: BROKER_URL
+              value: "http://{{ include "telemetry.name" $root }}-broker:8080"
+            - name: DB_POOL_SIZE
+              value: {{ $root.Values.dbPoolSize | quote }}
+            - name: QUEUE_CAPACITY
+              value: {{ $root.Values.queueCapacity | quote }}
+            - name: RATE
+              value: {{ $root.Values.streamer.rate | quote }}
+            - name: WORKERS
+              value: {{ $root.Values.collector.workers | quote }}
+            {{- if $root.Values.brokerTokenSecret }}
+            - name: BROKER_TOKEN
+              valueFrom: {secretKeyRef: {name: {{ $root.Values.brokerTokenSecret }}, key: token}}
+            {{- end }}
+          readinessProbe: {httpGet: {path: /readyz, port: http}, initialDelaySeconds: 2, periodSeconds: 3}
+          livenessProbe: {httpGet: {path: /healthz, port: http}, initialDelaySeconds: 10, periodSeconds: 10}
+          resources:
+            {{- toYaml $root.Values.resources | nindent 12 }}
+{{- if or (eq $role "broker") (eq $role "api") }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "telemetry.name" $root }}-{{ $role }}
+spec:
+  selector: {app.kubernetes.io/instance: {{ $root.Release.Name }}, app.kubernetes.io/component: {{ $role }}}
+  ports: [{name: http, port: 8080, targetPort: http}]
+{{- end }}
+{{- end }}

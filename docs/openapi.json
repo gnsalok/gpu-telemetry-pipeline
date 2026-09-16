@@ -1,0 +1,412 @@
+{
+  "components": {
+    "schemas": {
+      "ErrorDetail": {
+        "additionalProperties": false,
+        "properties": {
+          "location": {
+            "description": "Where the error occurred, e.g. 'body.items[3].tags' or 'path.thing-id'",
+            "type": "string"
+          },
+          "message": {
+            "description": "Error message text",
+            "type": "string"
+          },
+          "value": {
+            "description": "The value at the given location"
+          }
+        },
+        "type": "object"
+      },
+      "ErrorModel": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/schemas/ErrorModel.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "detail": {
+            "description": "A human-readable explanation specific to this occurrence of the problem.",
+            "examples": [
+              "Property foo is required but is missing."
+            ],
+            "type": "string"
+          },
+          "errors": {
+            "description": "Optional list of individual error details",
+            "items": {
+              "$ref": "#/components/schemas/ErrorDetail"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "instance": {
+            "description": "A URI reference that identifies the specific occurrence of the problem.",
+            "examples": [
+              "https://example.com/error-log/abc123"
+            ],
+            "format": "uri",
+            "type": "string"
+          },
+          "status": {
+            "description": "HTTP status code",
+            "examples": [
+              400
+            ],
+            "format": "int64",
+            "type": "integer"
+          },
+          "title": {
+            "description": "A short, human-readable summary of the problem type. This value should not change between occurrences of the error.",
+            "examples": [
+              "Bad Request"
+            ],
+            "type": "string"
+          },
+          "type": {
+            "default": "about:blank",
+            "description": "A URI reference to human-readable documentation for the error.",
+            "examples": [
+              "https://example.com/errors/example"
+            ],
+            "format": "uri",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "GPU": {
+        "additionalProperties": false,
+        "properties": {
+          "device": {
+            "type": "string"
+          },
+          "gpu_index": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "host": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "host",
+          "gpu_index",
+          "device",
+          "model"
+        ],
+        "type": "object"
+      },
+      "GPUOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/schemas/GPUOutputBody.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/GPU"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "next_cursor": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "type": "object"
+      },
+      "Record": {
+        "additionalProperties": false,
+        "properties": {
+          "container": {
+            "type": "string"
+          },
+          "device": {
+            "type": "string"
+          },
+          "gpu_id": {
+            "type": "string"
+          },
+          "host": {
+            "type": "string"
+          },
+          "labels_raw": {
+            "type": "string"
+          },
+          "metric_name": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "namespace": {
+            "type": "string"
+          },
+          "pod": {
+            "type": "string"
+          },
+          "source_timestamp": {
+            "type": "string"
+          },
+          "uuid": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_timestamp",
+          "metric_name",
+          "gpu_id",
+          "device",
+          "uuid",
+          "model",
+          "host",
+          "value",
+          "labels_raw"
+        ],
+        "type": "object"
+      },
+      "Telemetry": {
+        "additionalProperties": false,
+        "properties": {
+          "event_id": {
+            "type": "string"
+          },
+          "gpu_uuid": {
+            "type": "string"
+          },
+          "metric_name": {
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/Record"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "value": {
+            "format": "double",
+            "type": "number"
+          }
+        },
+        "required": [
+          "event_id",
+          "timestamp",
+          "gpu_uuid",
+          "metric_name",
+          "value",
+          "source"
+        ],
+        "type": "object"
+      },
+      "TelemetryOutputBody": {
+        "additionalProperties": false,
+        "properties": {
+          "$schema": {
+            "description": "A URL to the JSON Schema for this object.",
+            "examples": [
+              "https://example.com/schemas/TelemetryOutputBody.json"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Telemetry"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "next_cursor": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "Persisted GPU telemetry. Timestamps are first committed collector processing times. Results are ordered by timestamp and event ID. Pagination is a live view, not a historical snapshot.",
+    "title": "GPU Telemetry Pipeline",
+    "version": "1.0.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/gpus": {
+      "get": {
+        "operationId": "list-gpus",
+        "parameters": [
+          {
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 100,
+              "format": "int64",
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "GPU UUID returned as next_cursor by the previous page",
+            "explode": false,
+            "in": "query",
+            "name": "after",
+            "schema": {
+              "description": "GPU UUID returned as next_cursor by the previous page",
+              "maxLength": 40,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GPUOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "List GPUs with stored telemetry",
+        "tags": [
+          "Telemetry"
+        ]
+      }
+    },
+    "/api/v1/gpus/{id}/telemetry": {
+      "get": {
+        "operationId": "query-telemetry",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "maxLength": 40,
+              "type": "string"
+            }
+          },
+          {
+            "description": "Inclusive RFC3339 processing timestamp",
+            "explode": false,
+            "in": "query",
+            "name": "start_time",
+            "schema": {
+              "description": "Inclusive RFC3339 processing timestamp",
+              "maxLength": 64,
+              "type": "string"
+            }
+          },
+          {
+            "description": "Inclusive RFC3339 processing timestamp",
+            "explode": false,
+            "in": "query",
+            "name": "end_time",
+            "schema": {
+              "description": "Inclusive RFC3339 processing timestamp",
+              "maxLength": 64,
+              "type": "string"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 100,
+              "format": "int64",
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "explode": false,
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "maxLength": 1024,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelemetryOutputBody"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorModel"
+                }
+              }
+            },
+            "description": "Error"
+          }
+        },
+        "summary": "Query GPU observations in chronological order",
+        "tags": [
+          "Telemetry"
+        ]
+      }
+    }
+  }
+}
