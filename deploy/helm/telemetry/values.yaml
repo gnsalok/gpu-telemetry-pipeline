@@ -1,0 +1,36 @@
+image:
+  repository: gpu-telemetry
+  tag: dev
+  pullPolicy: IfNotPresent
+broker:
+  replicas: 2
+collector:
+  replicas: 2
+  workers: 2
+streamer:
+  replicas: 1
+  rate: 100
+api:
+  replicas: 1
+queueCapacity: 100000
+dbPoolSize: 4
+# Optional existing Secret with key token; protects broker mutation endpoints.
+brokerTokenSecret: ""
+postgresql:
+  enabled: true
+  image: postgres:18-alpine
+  username: telemetry
+  password: telemetry-local-only
+  database: telemetry
+  storage: 2Gi
+  storageClass: ""
+  resources:
+    requests: {cpu: 250m, memory: 256Mi}
+    limits: {cpu: "1", memory: 1Gi}
+# When PostgreSQL is disabled, provide an existing Secret with key url.
+externalDatabaseSecret: ""
+resources:
+  requests: {cpu: 50m, memory: 64Mi}
+  limits: {cpu: 500m, memory: 256Mi}
+# Preferred spreading never prevents scheduling on a single-node cluster.
+spreadAcrossNodes: false

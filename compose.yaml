@@ -1,0 +1,57 @@
+name: gpu-telemetry
+x-app: &app
+  image: gpu-telemetry:dev
+  build: .
+  init: true
+  stop_grace_period: 35s
+  read_only: true
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: [ALL]
+  environment: &env
+    DATABASE_URL: postgres://telemetry:telemetry@postgres:5432/telemetry?sslmode=disable
+    BROKER_URL: http://broker:8080
+    DB_POOL_SIZE: "4"
+  depends_on:
+    migrate:
+      condition: service_completed_successfully
+services:
+  postgres:
+    image: postgres:18-alpine
+    command: ["postgres", "-c", "max_connections=200"]
+    environment:
+      POSTGRES_USER: telemetry
+      POSTGRES_PASSWORD: telemetry
+      POSTGRES_DB: telemetry
+    ports: ["127.0.0.1:${DB_PORT:-15432}:5432"]
+    volumes: ["postgres-data:/var/lib/postgresql"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U telemetry -d telemetry"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+  migrate:
+    <<: *app
+    command: [migrate]
+    depends_on:
+      postgres:
+        condition: service_healthy
+  broker:
+    <<: *app
+    command: [broker]
+    ports: ["127.0.0.1:${BROKER_PORT:-8081}:8080"]
+  api:
+    <<: *app
+    command: [api]
+    ports: ["127.0.0.1:${API_PORT:-8080}:8080"]
+  collector:
+    <<: *app
+    command: [collector]
+  streamer:
+    <<: *app
+    command: [streamer]
+    environment:
+      <<: *env
+      RATE: "${RATE:-100}"
+      LOOPS: "${LOOPS:-0}"
+volumes:
+  postgres-data:

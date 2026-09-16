@@ -1,0 +1,8 @@
+.git
+bin
+coverage*
+work
+.env
+docs
+deploy
+scripts

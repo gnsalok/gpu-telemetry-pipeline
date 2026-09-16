@@ -1,0 +1,11 @@
+The pipeline is installed. Check pods and migration job:
+  kubectl get pods,jobs -n {{ .Release.Namespace }}
+
+Expose the API locally:
+  kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "telemetry.name" . }}-api 8080:8080
+Then open http://localhost:8080/docs or GET /api/v1/gpus.
+
+Scale independently:
+  kubectl scale deployment/{{ include "telemetry.name" . }}-collector -n {{ .Release.Namespace }} --replicas=10
+
+The bundled PostgreSQL is a single instance with persistent storage, not HA.
