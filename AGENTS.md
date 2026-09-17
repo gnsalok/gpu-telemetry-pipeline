@@ -49,6 +49,5 @@
 - Keep replicas independent; avoid fixed pod addresses, sticky sessions, or required node separation.
 - Distinguish application scaling from database HA and multi-node performance.
 - Preserve `data/telemetry.csv`; do not repair or remove source rows without an explicit requirement.
-- Record substantive AI prompts and actual corrections in `docs/ai-workflow.md`.
 - Report only executed checks and measured results in `docs/verification.md`.
 - Do not invent human intervention, coverage figures, production readiness, or HA claims.
