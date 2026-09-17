@@ -137,9 +137,9 @@ Production ingress authentication, TLS policy, least-privilege database roles, d
 
 ## Design and AI workflow
 
+- [Coding-agent guidance](AGENTS.md)
 - [Architecture and guarantees](docs/architecture.md)
 - [CSV analysis](docs/data-analysis.md)
 - [Executed checks and measurements](docs/verification.md)
-- [AI prompts, workflow, and corrections](docs/ai-workflow.md)
 
 PostgreSQL is the shared throughput/availability boundary; adding brokers does not eliminate it. The implementation favors explicit correctness and bounded work over building a replicated log or consensus algorithm.
