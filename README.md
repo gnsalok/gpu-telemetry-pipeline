@@ -53,7 +53,7 @@ curl 'http://localhost:8080/api/v1/gpus/GPU-5fd4f087-86f3-7a43-b711-4771313afc50
 - Responses contain `items` and, when another page exists, `next_cursor`.
 - For GPU pages, pass the cursor as `after`. For telemetry, pass it as `cursor` with the same time filters.
 - Both boundaries are inclusive RFC3339 timestamps. URL-encode offsets containing `+`.
-- Telemetry is ordered by `(timestamp, event_id)`. Time is assigned during the first committed collector insert, not copied from the CSV.
+- Telemetry is ordered by `(timestamp, event_id)`. *Time is assigned during the first committed collector insert, not copied from the CSV.*
 - Page size defaults to 100, maximum 1,000. Pagination is a live view, not a repeatable snapshot during concurrent ingestion.
 - Unknown GPUs return 404; a known GPU with no matching observations returns an empty array. Malformed filters return 400; schema validation may return 422; unavailable storage returns 503.
 - `/docs` serves interactive documentation; `/openapi.json` serves the generated contract. `make openapi` generates [docs/openapi.json](docs/openapi.json) offline from the same route types.
