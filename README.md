@@ -143,3 +143,7 @@ Production ingress authentication, TLS policy, least-privilege database roles, d
 - [Executed checks and measurements](docs/verification.md)
 
 PostgreSQL is the shared throughput/availability boundary; adding brokers does not eliminate it. The implementation favors explicit correctness and bounded work over building a replicated log or consensus algorithm.
+
+## Maintainer
+
+[Alok Tripathi](https://github.com/gnsalok)
