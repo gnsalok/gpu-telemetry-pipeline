@@ -15,13 +15,27 @@ flowchart LR
 
 ## Start locally
 
-Prerequisites: Docker Desktop with its engine running. Go 1.25.6+ is needed for development; Python 3 for the acceptance scripts. Kubernetes and Helm 3 are needed only for cluster deployment.
+Prerequisites: Git, Make, curl, and Docker Desktop with its engine running. Go 1.25.6+ is needed for development; Python 3 for the acceptance scripts. Kubernetes and Helm 3 are needed only for cluster deployment.
 
 ```sh
+git clone https://github.com/gnsalok/gpu-telemetry-pipeline.git
+cd gpu-telemetry-pipeline
 make up
-curl http://localhost:8080/api/v1/gpus
-open http://localhost:8080/docs
+# Wait for API readiness, with at most 30 bounded attempts.
+(
+  attempt=0
+  until curl --fail --silent --output /dev/null --max-time 2 http://localhost:8080/readyz; do
+    attempt=$((attempt + 1))
+    if [ "$attempt" -ge 30 ]; then
+      echo 'API did not become ready; see Troubleshooting.' >&2
+      exit 1
+    fi
+    sleep 2
+  done
+) && curl --fail http://localhost:8080/api/v1/gpus
 ```
+
+Browse the interactive API documentation at http://localhost:8080/docs. Readiness confirms the schema is available; GPU inventory may briefly be empty until collectors persist observations.
 
 This builds the image, starts PostgreSQL, runs migrations, and starts all four roles. Wait for `/readyz` to return 200 before querying. The source generates up to 100 observations/second and loops continuously. API and broker ports are bound to loopback.
 
@@ -46,8 +60,47 @@ Creates a uniquely named temporary Compose stack on free local ports, streams on
 ```sh
 curl 'http://localhost:8080/api/v1/gpus?limit=100'
 curl 'http://localhost:8080/api/v1/gpus/GPU-5fd4f087-86f3-7a43-b711-4771313afc50/telemetry?limit=100'
-curl 'http://localhost:8080/api/v1/gpus/GPU-5fd4f087-86f3-7a43-b711-4771313afc50/telemetry?start_time=2026-09-17T00:00:00Z&end_time=2026-09-17T23:59:59Z'
 ```
+
+An illustrative telemetry response is shown below. Event IDs and processing timestamps are generated during ingestion and will differ in your run. Optional empty workload fields are omitted; `next_cursor` appears only when another page exists.
+
+```json
+{
+  "items": [
+    {
+      "event_id": "a1b2c3d4e5f60718293a4b5c6d7e8f90",
+      "timestamp": "2026-09-18T10:00:00.123456Z",
+      "gpu_uuid": "GPU-5fd4f087-86f3-7a43-b711-4771313afc50",
+      "metric_name": "DCGM_FI_DEV_GPU_UTIL",
+      "value": 0,
+      "source": {
+        "source_timestamp": "2025-07-18T20:42:34Z",
+        "metric_name": "DCGM_FI_DEV_GPU_UTIL",
+        "gpu_id": "0",
+        "device": "nvidia0",
+        "uuid": "GPU-5fd4f087-86f3-7a43-b711-4771313afc50",
+        "model": "NVIDIA H100 80GB HBM3",
+        "host": "mtv5-dgx1-hgpu-031",
+        "value": "0",
+        "labels_raw": "DCGM_FI_DRIVER_VERSION=\"535.129.03\",Hostname=\"mtv5-dgx1-hgpu-031\",UUID=\"GPU-5fd4f087-86f3-7a43-b711-4771313afc50\",__name__=\"DCGM_FI_DEV_GPU_UTIL\",device=\"nvidia0\",gpu=\"0\",instance=\"mtv5-dgx1-hgpu-031:9400\",job=\"dgx_dcgm_exporter\",modelName=\"NVIDIA H100 80GB HBM3\""
+      }
+    }
+  ]
+}
+```
+
+To try inclusive time filters using an observation from your own run (requires Python 3), fetch its processing timestamp and use it as both boundaries:
+
+```sh
+gpu_uuid='GPU-5fd4f087-86f3-7a43-b711-4771313afc50'
+observation_time=$(curl --fail --silent --show-error "http://localhost:8080/api/v1/gpus/$gpu_uuid/telemetry?limit=1" |
+  python3 -c 'import json,sys; items=json.load(sys.stdin)["items"]; items or sys.exit("No observations yet; retry after ingestion."); print(items[0]["timestamp"])') &&
+curl --fail --get "http://localhost:8080/api/v1/gpus/$gpu_uuid/telemetry" \
+  --data-urlencode "start_time=$observation_time" \
+  --data-urlencode "end_time=$observation_time"
+```
+
+Both boundaries include the selected observation. `--data-urlencode` also handles timezone offsets safely.
 
 - GPU identity is the CSV `uuid`, not the host-local `gpu_id`.
 - Responses contain `items` and, when another page exists, `next_cursor`.
@@ -86,6 +139,23 @@ The verification script creates its own release/namespace, tests finite 1/5/10 p
 Manual scaling is intentional; HPA is not required to demonstrate elasticity. Each streamer independently replays the CSV, so replicas increase offered load. Collectors compete for messages; delivery is not broadcast.
 
 For another cluster, publish the image to your registry and override `image.repository`, `image.tag`, and optionally `postgresql.storageClass`. Set `spreadAcrossNodes=true` for preferred spreading. No hard anti-affinity prevents single-node scheduling. For an external database, set `postgresql.enabled=false` and `externalDatabaseSecret` to an existing Secret with key `url`.
+
+## Project layout
+
+```text
+cmd/pipeline/    Application entry point and role selection
+internal/
+  worker/       CSV streamer and collector loops
+  broker/       Queue HTTP protocol and client
+  store/        Queue transactions, telemetry queries, and schema
+  api/          Public REST API and generated OpenAPI
+  model/        Event types and measurement validation
+  config/       Configuration and bounds
+deploy/helm/    Kubernetes deployment chart
+scripts/        Docker and Kubernetes acceptance tests
+data/           Supplied telemetry dataset
+docs/           Architecture, analysis, OpenAPI, and verification
+```
 
 ## Development and tests
 
@@ -135,11 +205,20 @@ Dead-letter inspection returns the first 100 records. Replay retains ID/payload 
 
 Production ingress authentication, TLS policy, least-privilege database roles, database HA/backups, and retention policies remain deployment hardening work. The included database is a single instance, not an HA system.
 
+## Troubleshooting
+
+- **Docker is unavailable:** start Docker Desktop and confirm `docker info` succeeds before building or starting services.
+- **Ports are occupied:** choose free Compose ports, for example `API_PORT=18080 BROKER_PORT=18081 DB_PORT=25432 make up`. Query the API at `http://localhost:18080` and the broker at `http://localhost:18081`; repeat the same overrides for subsequent Compose commands. For Kubernetes, use `kubectl port-forward -n telemetry svc/telemetry-telemetry-api 18080:8080` to avoid an occupied local 8080.
+- **Compose services are not ready:** inspect `docker compose ps --all` and `docker compose logs --tail=100 postgres migrate broker collector api`. Applications depend on successful migration; readiness requires the schema. Check database and migration errors before restarting services.
+- **Kubernetes is unavailable or using the wrong context:** enable Kubernetes in Docker Desktop, check `kubectl config current-context`, select `kubectl config use-context docker-desktop` for the local demo, and confirm `kubectl get nodes` shows a Ready node.
+- **Pods cannot find the image:** run `make image` before `make k8s-install` on Docker Desktop. For another cluster, publish the image and supply the registry repository/tag to Helm. Inspect the affected pod with `kubectl describe pod POD_NAME -n telemetry`.
+- **Kubernetes pods are not ready:** inspect `make k8s-status`, `kubectl get jobs -n telemetry`, and `kubectl get events -n telemetry --sort-by=.metadata.creationTimestamp`. Use `kubectl logs -n telemetry job/JOB_NAME` for the migration Job named by the jobs command; it may retry while PostgreSQL starts. Collector logs are available with `kubectl logs -n telemetry -l app.kubernetes.io/component=collector --tail=100`.
+
 ## Design and AI workflow
 
 - [Coding-agent guidance](AGENTS.md)
 - [Architecture and guarantees](docs/architecture.md)
-- [CSV analysis](docs/data-analysis.md)
+- [CSV data source analysis](docs/data-analysis.md)
 - [Executed checks and measurements](docs/verification.md)
 
 PostgreSQL is the shared throughput/availability boundary; adding brokers does not eliminate it. The implementation favors explicit correctness and bounded work over building a replicated log or consensus algorithm.
